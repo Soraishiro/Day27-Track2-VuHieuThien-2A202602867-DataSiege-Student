@@ -138,8 +138,10 @@ def check_contract_checkpoint(payload, ctx):
 
 def _lineage_group(payload):
     """Nhóm các lần chạy của cùng mô hình bằng định danh được công bố."""
-    for key in ("model", "dbt_model", "model_name", "job_name"):
+    for key in ("job", "job_name", "model", "dbt_model", "model_name"):
         value = payload.get(key)
+        if isinstance(value, dict):
+            value = value.get("name")
         if isinstance(value, str) and value.strip():
             return value.strip()
     return None
@@ -198,8 +200,8 @@ def check_lineage_run(payload, ctx):
         if isinstance(expected, list):
             missing = {str(x) for x in expected} - actual
         else:
-            model = str(payload.get("model") or payload.get("dbt_model") or payload.get("model_name") or payload.get("job_name") or "")
-            # dbt có thể trả về tên đầy đủ: dbt:package.stg_orders.
+            model = _lineage_group(payload) or ""
+            # dbt có thể trả về tên đầy đủ: dbt:package.stg_orders hoặc dbt:stg_orders.
             normalized = model.removeprefix("dbt:").rsplit(".", 1)[-1]
             missing = {"raw.orders", "raw.customers"} - actual if normalized == "stg_orders" else set()
         if missing:

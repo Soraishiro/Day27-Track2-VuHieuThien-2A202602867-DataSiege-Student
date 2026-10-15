@@ -1,0 +1,22 @@
+{
+  "result": {
+    "n_faulty": 39,
+    "n_clean": 121,
+    "tpr": 0.9231,
+    "fpr": 0.0,
+    "cost_ledger": 240.0,
+    "budget": 220.0,
+    "cost_overage": 0.0909,
+    "score": 44.34,
+    "phase": "public",
+    "defense_file": "S:\\ai20k\\Day27-Track2-VuHieuThien-2A202602867-DataSiege-Student\\solution\\defense.py",
+    "per_pillar_band": {
+      "n/a": "n/a",
+      "contracts": "high",
+      "ai_infra": "high",
+      "lineage": "high",
+      "checks": "high"
+    }
+  },
+  "signature": "fe3bfd94aace59556ca0de55992369577094c2ed39f842bf3e87927cd9abc459"
+}

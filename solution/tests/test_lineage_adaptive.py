@@ -63,6 +63,26 @@ class LineageAdaptiveTests(unittest.TestCase):
     def test_other_similar_model_name_not_assumed(self):
         self.assertFalse(self.check('project.stg_orders_archive','other',{'raw.orders'}).alert)
 
+    def test_job_payload_field_recognized(self):
+        self.tools.responses['lineage_graph_slice'] = {
+            'duration_ms': 2000,
+            'actual_upstream': ['raw.orders'],
+            'actual_downstream_count': 1,
+        }
+        res = defense.check_lineage_run({'run_id': 'j1', 'job': 'dbt:stg_orders'}, self.ctx)
+        self.assertTrue(res.alert)
+        self.assertIn('raw.customers', res.reason)
+
+    def test_job_dict_payload_field_recognized(self):
+        self.tools.responses['lineage_graph_slice'] = {
+            'duration_ms': 2000,
+            'actual_upstream': ['raw.orders'],
+            'actual_downstream_count': 1,
+        }
+        res = defense.check_lineage_run({'run_id': 'j2', 'job': {'name': 'dbt:stg_orders'}}, self.ctx)
+        self.assertTrue(res.alert)
+        self.assertIn('raw.customers', res.reason)
+
     def test_reset_state_across_runs(self):
         for n in range(3):
             self.assertFalse(self.check('dbt:dim_accounts',f'a{n}',{'raw.orders','raw.accounts'}).alert)
