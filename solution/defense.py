@@ -134,6 +134,17 @@ def check_contract_checkpoint(payload, ctx):
     return _verdict(pillar, reasons)
 
 
+def _declared_lineage_job(payload):
+    """Read documented job/model metadata; never infer an event-specific answer."""
+    for field in ("job", "model", "dbt_model", "job_name", "model_name"):
+        value = payload.get(field)
+        if isinstance(value, dict):
+            value = value.get("name")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
 def check_lineage_run(payload, ctx):
     pillar = "lineage"
     run_id = payload.get("run_id")
@@ -156,8 +167,9 @@ def check_lineage_run(payload, ctx):
         if isinstance(expected, list):
             missing = {str(x) for x in expected} - actual
         else:
-            model = str(payload.get("model") or payload.get("dbt_model") or payload.get("job_name") or "")
-            missing = {"raw.orders", "raw.customers"} - actual if model in ("dbt:stg_orders", "stg_orders") else set()
+            model = _declared_lineage_job(payload)
+            normalized = model.removeprefix("dbt:").rsplit(".", 1)[-1]
+            missing = {"raw.orders", "raw.customers"} - actual if normalized == "stg_orders" else set()
         if missing:
             reasons.append("Thiếu upstream: " + ", ".join(sorted(missing)))
     return _verdict(pillar, reasons)
