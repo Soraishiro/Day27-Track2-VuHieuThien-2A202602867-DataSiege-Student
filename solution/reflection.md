@@ -1,7 +1,9 @@
-# Reflection (≤1 page)
+# Nhìn lại giải pháp Data Siege
 
-Fill this in before you submit.
+Khó khăn lớn nhất của bài lab là phân biệt lỗi nhỏ với biến động bình thường. Các chỉ số như số đơn hàng, giá trị giao dịch, độ trễ hay mức thay đổi đặc trưng không đứng yên. Nếu chỉ so sánh với một ngưỡng thấp, hệ thống có thể cảnh báo nhầm. Ngược lại, ngưỡng quá cao sẽ bỏ sót lỗi tinh vi. Với dữ liệu đơn hàng, tôi sử dụng các giới hạn lịch sử trước, sau đó xét thêm trường hợp nhiều chỉ số cùng tiến sát giới hạn. Với đặc trưng phục vụ mô hình, tôi đặt ngưỡng có khoảng an toàn thay vì dùng trực tiếp mức cao nhất của dữ liệu lịch sử. Các lựa chọn này vẫn cần được kiểm chứng trên luồng thực tế.
 
-**Which fault types were hardest to catch, and why?**
+Tôi triển khai đủ năm bộ xử lý và dùng đúng công cụ cho từng loại sự kiện. Mỗi bộ xử lý chỉ cần một lần truy vấn cho một định danh chưa gặp; kết quả được lưu trong `ctx.state` để tránh trả phí hai lần nếu truy vấn lặp. Việc giảm số lần gọi công cụ không được đánh đổi bằng cách bỏ qua toàn bộ sự kiện có khả năng phát sinh lỗi. Mỗi kết luận cảnh báo đều có lý do gắn với chỉ số hoặc điều kiện vi phạm.
 
-**What would you change about your cost/coverage tradeoff, if you had another pass?**
+Trong sandbox hiện tại, 30 bài kiểm thử đơn vị dùng dữ liệu giả lập đã đạt. Kết quả này xác nhận các nhánh xử lý và giao diện nhưng **chưa chứng minh** tỷ lệ phát hiện, tỷ lệ báo giả hay điểm số thực tế. Tôi chưa có báo cáo chạy chính thức của Practice, Public và Private. Trước khi nộp, cần chạy những pha đó bằng chương trình đi kèm repository, đối chiếu 120 nhãn đã công bố ở Practice và giữ nguyên mã sau khi chốt trước Private.
+
+Nếu có thêm thời gian, tôi sẽ kiểm tra ngưỡng kết hợp trên nhiều dải dữ liệu bình thường, phân tích các trường hợp bỏ sót theo từng trụ cột và chỉ giữ thay đổi làm tăng điểm tổng sau khi tính cả báo giả và chi phí. Cách đánh giá đó đáng tin cậy hơn việc chọn ngưỡng chỉ vì nó giúp bắt được vài trường hợp riêng lẻ.
