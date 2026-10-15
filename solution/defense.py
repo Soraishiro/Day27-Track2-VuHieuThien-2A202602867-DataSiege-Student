@@ -134,6 +134,47 @@ def check_contract_checkpoint(payload, ctx):
     return _verdict(pillar, reasons)
 
 
+
+
+def _lineage_group(payload):
+    """Nhóm các lần chạy của cùng mô hình bằng định danh được công bố."""
+    for key in ("model", "dbt_model", "model_name", "job_name"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _lineage_history_check(payload, actual, downstream, duration, ctx):
+    """So sánh với tập phụ thuộc ổn định đã quan sát trong CÙNG lượt chạy.
+
+    Không tham chiếu dữ liệu của sự kiện tương lai, không đọc đáp án, không
+    phát cảnh báo nếu chưa có ít nhất 3 mẫu nhất quán của cùng mô hình.
+    """
+    group = _lineage_group(payload)
+    if group is None or not actual or downstream is None or downstream <= 0:
+        return None
+    if duration is None or duration < 0:
+        return None
+    max_duration = _baseline(ctx, "lineage_duration_ms_max")
+    if max_duration is None or duration > max_duration:
+        return None
+    bucket = ctx.state.setdefault("_lineage_observations", {}).setdefault(group, {})
+    signature = tuple(sorted(actual))
+    count = sum(bucket.values())
+    if count >= 3:
+        reference, occurrences = max(bucket.items(), key=lambda item: (item[1], item[0]))
+        # Một sơ đồ được xem là ổn định chỉ khi >=80% các lần trước giống nhau.
+        if (occurrences >= 3 and occurrences * 5 >= count * 4
+                and len(reference) >= 2 and actual < set(reference)):
+            return "Thiếu quan hệ đầu vào so với các lần chạy trước: " + ", ".join(
+                sorted(set(reference) - actual))
+    # Chỉ thu thập mẫu không bị lỗi rõ ràng; cần biết mẫu hiện tại trước
+    # khi ghi vào trạng thái, tránh dùng chính mẫu đó làm bằng chứng.
+    bucket[signature] = bucket.get(signature, 0) + 1
+    return None
+
+
 def check_lineage_run(payload, ctx):
     pillar = "lineage"
     run_id = payload.get("run_id")
@@ -144,22 +185,30 @@ def check_lineage_run(payload, ctx):
         return _verdict(pillar, note="Không nhận được đồ thị lineage hợp lệ")
     reasons = []
     _high(_get_metric(data, "duration_ms"), _baseline(ctx, "lineage_duration_ms_max"), "duration_ms", reasons)
+    duration = _get_metric(data, "duration_ms")
     downstream = _get_metric(data, "actual_downstream_count")
     if downstream == 0:
         reasons.append("Đầu ra không có nút tiêu thụ")
     upstream = data.get("actual_upstream")
-    if isinstance(upstream, list):
-        actual = {str(x) for x in upstream}
+    if isinstance(upstream, list) and all(isinstance(x, str) for x in upstream):
+        actual = set(upstream)
         expected = payload.get("expected_upstream")
         if not isinstance(expected, list):
             expected = payload.get("required_upstream")
         if isinstance(expected, list):
             missing = {str(x) for x in expected} - actual
         else:
-            model = str(payload.get("model") or payload.get("dbt_model") or payload.get("job_name") or "")
-            missing = {"raw.orders", "raw.customers"} - actual if model in ("dbt:stg_orders", "stg_orders") else set()
+            model = str(payload.get("model") or payload.get("dbt_model") or payload.get("model_name") or payload.get("job_name") or "")
+            # dbt có thể trả về tên đầy đủ: dbt:package.stg_orders.
+            normalized = model.removeprefix("dbt:").rsplit(".", 1)[-1]
+            missing = {"raw.orders", "raw.customers"} - actual if normalized == "stg_orders" else set()
         if missing:
             reasons.append("Thiếu upstream: " + ", ".join(sorted(missing)))
+        # Chỉ học từ quan sát chưa bị cảnh báo bởi các điều kiện chắc chắn.
+        if not reasons:
+            dynamic_reason = _lineage_history_check(payload, actual, downstream, duration, ctx)
+            if dynamic_reason:
+                reasons.append(dynamic_reason)
     return _verdict(pillar, reasons)
 
 
