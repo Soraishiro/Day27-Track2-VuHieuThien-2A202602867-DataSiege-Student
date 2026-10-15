@@ -1,42 +1,46 @@
-# FINAL REPORT
+# Báo cáo kết quả bài lab Data Siege
 
-## B?i c?nh
-B�i lab Data Siege l� m?t th? th�ch v? vi?c ph�t hi?n l?i trong m?t lu?ng s? ki?n c?a h? th?ng d? li?u, bao g?m 5 lo?i s? ki?n: data_batch, contract_checkpoint, lineage_run, feature_materialization, embedding_batch. M?i lo?i s? ki?n c� m?t c�ng c? tuong ?ng d? truy v?n tr?ng th�i c?a h? th?ng, v� m?i llamadas c� chi ph�. M?c ti�u l� t?i uu h�a di?m s? d?a tr�n c�ng th?c?? = 100 � (0.5�TPR - 0.3�FPR - 0.2�min(cost_overage, 1)).
+## 1. Mục tiêu và phạm vi
 
-## Ki?n tr�c x? l�
-Ch�ng ta d� tri?n khai m?t h? th?ng ph�t hi?n l?i trong solution/defense.py v?i 5 handler, m?i handler cho m?t lo?i s? ki?n. M?i handler s? d?ng ctx.tools d? g?i c�c c�ng c? ???????, v� s? d?ng ctx.state d? luu tr? cache c?a k?t qu? c�c cu?c g?i c�ng c? d? tr�nh g?i l?p. C�c quy?t d?nh d?a tr�n vi?c so s�nh c�c ch? s? th?c t? v?i c�c ngu?ng t? ctx.baseline, v� k?t h?p c�c ch? s? d? ph�t hi?n l?i ph?c t?p.
+Bài lab yêu cầu xây dựng bộ phát hiện lỗi cho một luồng dữ liệu gồm năm loại sự kiện: `data_batch`, `contract_checkpoint`, `lineage_run`, `feature_materialization` và `embedding_batch`. Mỗi sự kiện phải được xử lý trong `solution/defense.py` bằng giao diện được công bố. Điểm số phụ thuộc vào tỷ lệ phát hiện đúng (TPR), tỷ lệ cảnh báo nhầm (FPR) và mức vượt ngân sách công cụ:
 
-## C�c quy?t d?nh theo tr? c?t
-- **checks** (data_batch): Ki?m tra row_count, null_rate.customer_id, mean_amount, staleness_min so v?i ngu?ng t? baseline, v� s? d?ng m?t ph�p lu?ng k?t h?p 4 chi?u d? ph�t hi?n l?i khi nhi?u ch? s? c�ng ti?n s�t gi?i h?n.
-- **contracts** (contract_checkpoint): Ki?m tra freshness_delay_min so v?i SLA v� baseline, v� ki?m tra c�c vi ph?m schema v� type.
-- **lineage** (lineage_run): Ki?m tra duration_ms so v?i baseline, ki?m tra actual_downstream_count == 0, v� ki?m tra s? thi?u upstream khi c� expected_upstream ho?c required_upstream trong payload, ho?c khi m� h�nh l� dbt:stg_orders ho?c stg_orders.
-- **ai_infra** (feature_materialization): Ki?m tra mean_shift_sigma so v?i ngu?ng, v?i ngu?ng du?c t�nh l� max(0.65, baseline * 1.5).
-- **ai_infra** (embedding_batch): Ki?m tra centroid_shift v� avg_doc_age_days so v?i ngu?ng t? baseline.
+```text
+Score = 100 × (0.5 × TPR − 0.3 × FPR − 0.2 × min(cost_overage, 1))
+```
 
-## Th? nghi?m
-Ch�ng ta d� ch?y d?y b? ki?m th? don v? (35/35 PASS), selfcheck (5/5), v� d� ch?y c�c fase Practice, Public v� Private tr�n h? th?ng th?c t?.
+## 2. Thiết kế giải pháp
 
-## K?t qu? th?t
-- Practice: score = 46.97, TPR = 0.9394, FPR = 0.0, cost_ledger = 180.0, cost_overage = 0.0
-- Public: score = 43.05, TPR = 0.8974, FPR = 0.0, cost_ledger = 240.0, cost_overage = 0.0909, per_pillar_band = { checks: high, contracts: high, lineage: high, ai_infra: high }
-- Private: score = 26.85, TPR = 0.537, FPR = 0.0, cost_overage = 0.0
+Mỗi loại sự kiện có một hàm kiểm tra riêng. Hàm nhận dữ liệu sự kiện và ngữ cảnh, gọi công cụ đo tương ứng rồi trả về `Verdict`. Các kết quả truy vấn được lưu trong `ctx.state` theo tên công cụ và tham số; nếu cùng truy vấn xuất hiện lại trong một lượt chạy, chương trình có thể dùng kết quả đã lưu.
 
-## Ph�n t�ch sai s�t
-C�c l?i c�n l?i (FN)????? lineage pillar, c? th? l� missing_upstream fault. �i?u n�y x?y ra v�?????????payload??expected_upstream?required_upstream,?????dbt:stg_orders?stg_orders?????missing_upstream???lineage???????????????,??????????????
+- **Kiểm tra dữ liệu (`checks`)**: đối chiếu số hàng, tỷ lệ thiếu mã khách hàng, giá trị giao dịch trung bình và độ trễ với các giới hạn lịch sử. Nếu từng chỉ số chưa vượt ngưỡng, chương trình xét thêm trường hợp nhiều chỉ số cùng tiến sát giới hạn.
+- **Hợp đồng dữ liệu (`contracts`)**: phát hiện vi phạm lược đồ, kiểu dữ liệu hoặc thời hạn cập nhật đã cam kết.
+- **Dòng phụ thuộc (`lineage`)**: kiểm tra thời gian chạy, đầu ra không có đơn vị tiêu thụ và các quan hệ đầu vào bắt buộc khi có đủ thông tin tham chiếu.
+- **Hạ tầng AI (`ai_infra`)**: kiểm tra mức dịch chuyển đặc trưng giữa huấn luyện và phục vụ; đồng thời kiểm tra độ dịch chuyển vector và tuổi trung bình của tài liệu.
 
-## ��nh d?i chi ph�
-Ch�ng ta kh�ng llamadas c�ng c? spend_so_far() ho?c budget_remaining() trong handler, v� v?y chi ph� ch? xu?t ph�t t? c�c cu?c llamadas c�ng c? ???????. We have not attempted to reduce cost by skipping checks, v� v?y cost_overage l� risultato delle chiamate effettive.
+Ngưỡng phát hiện kết hợp và ngưỡng dịch chuyển đặc trưng là lựa chọn thiết kế. Không có bằng chứng rằng chúng tối ưu cho mọi phân phối dữ liệu.
 
-## Gi?i h?n
-- Nossa abordagem kh�ng ph�t hi?n c�c l?i missing_upstream khi payload thi?u expected_upstream, required_upstream v� m� h�nh kh�ng ph?i l� dbt:stg_orders ho?c stg_orders.
-- We have not used any advanced statistical methods beyond the provided baselines and simple thresholds.
-- We have not attempts to optimize the combined threshold for the check pillar.
+## 3. Kết quả kiểm thử
 
-## C?i ti?n ti?p theo
-N?u c� th?i gian, ch�ng ta s?:
-1. Th�m ki?m tra cho tru?ng payload missing_upstream (n?u t?n t?i) d? ph�t hi?n th�m l?i missing_upstream trong lineage pillar.
-2. Th? nghi?m v?i c�c ngu?ng kh�c cho combined threshold trong check pillar d? xem li?u c� th? gi?m FP/FN kh�ng.
-3. ��nh gi� l?i �ch c?a vi?c luu tr? tr?ng th�i???? d? ph�t hi?n l?i theo th?i gian.
+| Chỉ số | Practice | Public | Private |
+|---|---:|---:|---:|
+| Điểm | 46,97 | 43,05 | 26,85 |
+| TPR | 93,94% | 89,74% | 53,70% |
+| FPR | 0% | 0% | 0% |
+| Chi phí công cụ | 180 tín dụng | 240 tín dụng | Không công bố trong báo cáo Private |
+| Mức vượt ngân sách | 0% | 9,09% | 0% |
 
-## K?t lu?n
-Ch�ng ta d� ho�n th�nh b�i lab Data Siege v?i c�c k?t qu? th?t t? c�c fase Practice, Public v� Private. M� c?a ch�ng ta kh�ng vi ph?m b?t k? quy t?c n�o v� d� du?c x�c th?c qua b? ki?m th? don v? v� selfcheck.
+Selfcheck đăng ký đủ **5/5** hàm xử lý. Bộ kiểm thử đơn vị có **35/35** bài đạt. Theo nhật ký thực thi, các báo cáo trên được tạo bằng chương trình đi kèm repository. Bản `solution/private_report.json` có trên GitHub, chứa điểm 26,85 và chữ ký ở dạng chuỗi 64 ký tự thập lục phân. Bài rà soát này chưa xác minh độc lập giá trị HMAC bằng khóa gốc. Hai báo cáo Practice/Public được ghi nhận trong nhật ký nhưng chưa được đưa lên nhánh `main` tại thời điểm rà soát.
+
+## 4. Phân tích kết quả và giới hạn
+
+Practice và Public có tỷ lệ cảnh báo nhầm bằng 0, nhưng Public vượt ngân sách 20 tín dụng, tương ứng mức vượt 9,09% và bị trừ khoảng 1,82 điểm. Phương án gọi công cụ cho các sự kiện vẫn đem lại kết quả cao hơn việc bỏ qua kiểm tra chỉ để tránh mức phạt nhỏ này.
+
+Tỷ lệ phát hiện của Private thấp hơn Public **36,04 điểm phần trăm**, trong khi FPR vẫn bằng 0. Kết quả cho thấy các điều kiện phát hiện chưa khái quát tốt sang pha có nhiều lỗi tinh vi hơn. Vì báo cáo Private không cung cấp lỗi theo từng trụ cột, không đủ bằng chứng để quy nguyên nhân chính cho lỗi thiếu quan hệ đầu vào hay bất kỳ loại lỗi cụ thể nào. Kiểm tra mã nguồn chỉ cho phép nêu các khả năng cần nghiên cứu, không thay thế phân tích nhãn thật.
+
+Một giới hạn khác là giải pháp chủ yếu dùng các ngưỡng tĩnh. `ctx.state` hiện hỗ trợ lưu kết quả công cụ, chưa có cơ chế ước lượng xu hướng hoặc thay đổi phân phối theo thời gian. Việc thêm cơ chế đó cần được đánh giá trên dữ liệu được phép sử dụng, với cả TPR, FPR và chi phí.
+
+## 5. Kết luận và hồ sơ
+
+Giải pháp đã triển khai đủ năm bộ xử lý, hoàn thành các kiểm thử được ghi trong nhật ký và tạo báo cáo Private. Kết quả đạt yêu cầu về cấu trúc và không phát sinh cảnh báo nhầm trong ba lượt đo đã báo cáo; tuy nhiên, khả năng phát hiện lỗi tinh vi vẫn còn hạn chế. Các cải tiến tiếp theo phải được đánh giá trên tập được phép dùng để hiệu chuẩn, không khai thác dữ liệu ẩn Private.
+
+Theo `RULES.md`, ba tệp chính được chấm là `solution/defense.py`, `solution/reflection.md` và `solution/private_report.json`. Nếu kiểm tra theo checklist VLearn có yêu cầu cả ba báo cáo, cần bổ sung `solution/practice_report.json` và `solution/public_report.json` từ các lượt chạy gốc trước khi xác nhận đủ hồ sơ.
