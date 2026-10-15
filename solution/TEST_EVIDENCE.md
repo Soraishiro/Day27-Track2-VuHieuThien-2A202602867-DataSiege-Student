@@ -6,9 +6,9 @@
 - Tệp được sửa hoặc tạo để nộp: chỉ thuộc `solution/` và `submission/`.
 - Đã triển khai 5 handler với mapping `checks`, `contracts`, `lineage`, `ai_infra`, `ai_infra`.
 - Chạy `python -m py_compile solution/defense.py`: PASS.
-- Chạy `python -m unittest discover -s solution/tests -v`: PASS, 30 test.
+- Chạy `python -m unittest discover -s solution/tests -v`: PASS, 35 test.
 - Chạy kiểm tra cấu trúc bằng bản sao tự tạo dựa trên `harness/selfcheck.py` đã đọc từ GitHub: 5/5.
-- Test trên dữ liệu giả lập xác nhận: cảnh báo lỗi rõ, xử lý giá trị thiếu, điều kiện biên, cache, deterministic output, không xuất stdout và trạng thái giữa lần chạy.
+- 35 bài kiểm thử xác nhận: cảnh báo lỗi rõ, xử lý giá trị thiếu, điều kiện biên, cache, deterministic output, không xuất stdout và trạng thái giữa lần chạy.
 
 ## Chưa xác minh
 
@@ -16,6 +16,7 @@
 - Chưa có số liệu TP/FP/FN/TN, TPR/FPR, điểm thực hoặc chi phí thực cho bất kỳ pha nào.
 - Bài kiểm thử tại sandbox sử dụng API rút gọn có cùng hợp đồng `Verdict` và đăng ký handler, không thay thế việc chạy harness chính thức.
 - `solution/private_report.json` phải do harness thực tạo, không tự sinh thủ công.
+- Đã thêm `solution/evaluate_practice.py` kiểm tra quyết định theo `seq` và đối chiếu lại phép tính điểm. Công cụ được kiểm chứng trên bộ nhãn giả lập; chưa chạy với báo cáo Practice thực tế.
 
 ## Lệnh chạy trên bản clone chính thức
 
@@ -25,6 +26,7 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe harness\selfcheck.py
 .\.venv\Scripts\python.exe -m unittest discover -s solution\tests -v
 .\.venv\Scripts\python.exe harness\run.py --phase practice --defense solution/defense.py --out solution/practice_report.json
+.\.venv\Scripts\python.exe solution/evaluate_practice.py
 .\.venv\Scripts\python.exe harness\run.py --phase public --defense solution/defense.py --out solution/public_report.json
 ```
 
