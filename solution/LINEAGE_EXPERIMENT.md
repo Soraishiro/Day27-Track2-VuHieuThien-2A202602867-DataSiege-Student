@@ -21,3 +21,15 @@ Thay đổi: (1) nhận diện tên mô hình dbt có tiền tố gói/dự án;
 5. Không dùng nhãn, dữ liệu ẩn hoặc việc chạy lại Private để dò đáp án. Không thay `defense.py` trên main khi `private_report.json` hiện tại còn đại diện cho phiên bản cũ.
 
 Không kết luận phiên bản mới tốt hơn trước khi có kết quả thực tế.
+
+## Kiểm tra tự động trên bản clone chính thức
+
+Từ thư mục gốc của nhánh thử nghiệm, chạy:
+
+```powershell
+.\.venv\Scripts\python.exe harness\selfcheck.py
+.\.venv\Scripts\python.exe -m unittest discover -s solution\tests -v
+.\.venv\Scripts\python.exe solution\benchmark_candidate.py
+```
+
+Công cụ chỉ chạy Practice và Public, tự đối chiếu Practice theo `seq` và trả `candidate_pass` hoặc `keep_main`. Nếu mã thoát là 2 hoặc báo `keep_main`, **không** gộp nhánh. Kết quả là một phép thử mới, không phải bằng chứng thay cho báo cáo Private hiện tại.
